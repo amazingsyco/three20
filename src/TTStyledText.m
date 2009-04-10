@@ -114,7 +114,10 @@
                                  lineBreakMode:UILineBreakModeWordWrap];
         lastFrame = [self addFrameForText:text node:node after:lastFrame];
         lastFrame.width = textSize.width;
-        lastFrame.height = textSize.height;
+		  if([node isKindOfClass:[TTStyledLinkNode class]]){
+			  lastFrame.width += (3 + 16);  
+		  }
+		  lastFrame.height = textSize.height;
         lastFrame.font = font;
         height += textSize.height;
         break;
@@ -149,7 +152,10 @@
               NSString* line = [text substringWithRange:lineRange];
               lastFrame = [self addFrameForText:line node:node after:lastFrame];
               lastFrame.width = frameWidth;
-              lastFrame.height = wordSize.height;
+				if([node isKindOfClass:[TTStyledLinkNode class]]){
+					lastFrame.width += (3 + 16);  
+				}
+				lastFrame.height = wordSize.height;
               lastFrame.font = font;
             }
             
@@ -175,7 +181,10 @@
 
             lastFrame = [self addFrameForText:lines node:node after:lastFrame];
             lastFrame.width = linesSize.width;
-            lastFrame.height = linesSize.height;
+			  if([node isKindOfClass:[TTStyledLinkNode class]]){
+				  lastFrame.width += (3 + 16);  
+			  }
+			  lastFrame.height = linesSize.height;
             lastFrame.font = font;
             height += linesSize.height;
             break;
@@ -193,7 +202,10 @@
           NSString* line = !lineWidth ? word : [text substringWithRange:lineRange];
           lastFrame = [self addFrameForText:line node:node after:lastFrame];
           lastFrame.width = frameWidth;
-          lastFrame.height = wordSize.height;
+			if([node isKindOfClass:[TTStyledLinkNode class]]){
+				lastFrame.width += (3 + 16);  
+			}
+			lastFrame.height = wordSize.height;
           lastFrame.font = font;
           frameWidth = 0;
         }
@@ -281,18 +293,40 @@
     CGRect frameRect = CGRectMake(origin.x, origin.y, frame.width, frame.height);
     if ([frame.node isKindOfClass:[TTStyledLinkNode class]]) {
       TTStyledLinkNode* linkNode = (TTStyledLinkNode*)frame.node;
-      if (linkNode.highlighted) {
-        UIColor* fill[] = {[UIColor colorWithWhite:0 alpha:0.25]};
-        [[TTAppearance appearance] draw:TTStyleFill rect:CGRectInset(frameRect, -4, -3)
-                                   fill:fill fillCount:1 stroke:nil radius:4];
-      }
+		
+		UIImage *leftImage;
+		UIImage *middleImage;
+		UIImage *rightImage;
+		
+      if (!linkNode.highlighted) {
+//        UIColor* fill[] = {[UIColor colorWithWhite:1
+//											 alpha:0.25]};
+//        [[TTAppearance appearance] draw:TTStyleFill rect:CGRectInset(frameRect, -4, -3)
+//                                   fill:fill fillCount:1 stroke:nil radius:4];
+		  
+		  leftImage = [UIImage imageNamed:@"link-button-left.png"];
+		  middleImage = [UIImage imageNamed:@"link-button-middle.png"];
+		  rightImage = [UIImage imageNamed:@"link-button-right.png"];
+      }else{
+		  leftImage = [UIImage imageNamed:@"link-button-left-press.png"];
+		  middleImage = [UIImage imageNamed:@"link-button-middle-press.png"];
+		  rightImage = [UIImage imageNamed:@"link-button-right-press.png"];		  
+	  }
+		
+		[leftImage drawAtPoint:frameRect.origin blendMode:kCGBlendModeNormal alpha:1.0];
+		[middleImage drawInRect:CGRectMake(frameRect.origin.x + leftImage.size.width, frameRect.origin.y, frameRect.size.width - leftImage.size.width - rightImage.size.width, frameRect.size.height)
+					  blendMode:kCGBlendModeNormal 
+						  alpha:1.0];
+		[rightImage drawAtPoint:CGPointMake(frameRect.origin.x + frameRect.size.width - rightImage.size.width, frameRect.origin.y) blendMode:kCGBlendModeNormal alpha:1.0];
       
       if (!highlighted) {
         CGContextSaveGState(context);
         [[TTAppearance appearance].linkTextColor setFill];
       }
+		
+		CGRect textFrame = CGRectMake(frameRect.origin.x + 5, frameRect.origin.y-1, frameRect.size.width - 3 - 16, frameRect.size.height);
       
-      [frame.text drawInRect:frameRect withFont:frame.font];
+      [frame.text drawInRect:textFrame withFont:frame.font];
 
       if (!highlighted) {
         CGContextRestoreGState(context);

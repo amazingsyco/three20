@@ -27,8 +27,8 @@
     @"Here we have a url http://www.h0tlinkz.com followed by another http://www.internets.com",
     @"http://www.cnn.com is a url and the words you are now reading are the text that follows",
     @"Here is text that has absolutely no styles. Move along now. Nothing to see here. Goodbye now.",
-//    @"Let's test out some line breaks.\n\nOh yeah.",
-//    @"This is a message with a long url in it http://www.foo.com/abra/cadabra/abrabra/dabarababa",
+    @"Let's test out some line breaks.\n\nOh yeah.",
+    @"This is a message with a long url in it http://www.foo.com/abra/cadabra/abrabra/dabarababa",
     nil];
   NSString* url = @"tt://styledTextTableTest";
 
