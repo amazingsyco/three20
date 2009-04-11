@@ -1,15 +1,14 @@
 #import "Three20/TTGlobal.h"
 
-@class TTStyledText, TTStyledLinkNode;
+@class TTStyledText, TTStyledLinkNode, TTStyle;
 
 /**
  * A view that can display styled text.
  */
-@interface TTStyledLabel : UIView {
+@interface TTStyledTextLabel : UIView {
   TTStyledText* _text;
   UIFont* _font;
   UIColor* _textColor;
-  UIColor* _linkTextColor;
   UIColor* _highlightedTextColor;
   UITextAlignment _textAlignment;
   UIEdgeInsets _contentInset;
@@ -31,11 +30,6 @@
  * The color of the text.
  */
 @property(nonatomic, retain) UIColor* textColor;
-
-/**
- * The color applied to links in the text.
- */
-@property(nonatomic, retain) UIColor* linkTextColor;
 
 /**
  * The highlight color applied to the text.
@@ -72,11 +66,11 @@
  * You must use TTStyledTextTableView if you want links in your html to be touchable.
  */
 @interface TTStyledTextTableView : UITableView {
-  TTStyledLabel* _highlightedLabel;
+  TTStyledTextLabel* _highlightedLabel;
   CGPoint _highlightStartPoint;
   NSTimer* _highlightTimer;
 }
 
-@property(nonatomic,retain) TTStyledLabel* highlightedLabel;
+@property(nonatomic,retain) TTStyledTextLabel* highlightedLabel;
 
 @end

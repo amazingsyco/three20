@@ -1,7 +1,8 @@
 #import "Three20/TTStyledText.h"
 #import "Three20/TTStyledTextNode.h"
 #import "Three20/TTStyledTextParser.h"
-#import "Three20/TTAppearance.h"
+#import "Three20/TTStyle.h"
+#import "Three20/TTDefaultStyleSheet.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,9 +60,11 @@
 }
 
 - (void)layoutFrames {
+  //TTLOG(@"LAYOUT! %@", [NSDate date]);
   UIFont* baseFont = _font ? _font : [self defaultFont];
   UIFont* boldFont = nil;
   UIFont* italicFont = nil;
+  TTStyle* linkStyle = nil;
   NSCharacterSet* whitespace = [NSCharacterSet whitespaceAndNewlineCharacterSet];
   
   TTStyledTextFrame* lastFrame = nil;
@@ -92,6 +95,21 @@
       NSString* text = node.text;
       NSUInteger length = text.length;
       
+      TTStyle* style = nil;
+      if ([node isKindOfClass:[TTStyledSpanNode class]]) {
+        if ([node isKindOfClass:[TTStyledLinkNode class]]) {
+          if (!linkStyle) {
+            linkStyle = TTSTYLE(linkText);
+          }
+          style = linkStyle;
+        }
+        TTStyledSpanNode* span = (TTStyledSpanNode*)node;
+        TTStyle* spanStyle = [[TTStyleSheet globalStyleSheet] styleWithSelector:span.className];
+        if (spanStyle) {
+          style = spanStyle;
+        }
+      }
+
       // Figure out which font to use for the node
       UIFont* font = baseFont;
       if ([node isKindOfClass:[TTStyledLinkNode class]]
@@ -113,11 +131,9 @@
                                  constrainedToSize:CGSizeMake(_width, CGFLOAT_MAX)
                                  lineBreakMode:UILineBreakModeWordWrap];
         lastFrame = [self addFrameForText:text node:node after:lastFrame];
+        lastFrame.style = style;
         lastFrame.width = textSize.width;
-		  if([node isKindOfClass:[TTStyledLinkNode class]]){
-			  lastFrame.width += (3 + 16);  
-		  }
-		  lastFrame.height = textSize.height;
+        lastFrame.height = textSize.height;
         lastFrame.font = font;
         height += textSize.height;
         break;
@@ -139,31 +155,26 @@
         NSString* word = [text substringWithRange:wordRange];
 
         // Measure the word and check to see if it fits on the current line
-        CGSize wordSize = [word sizeWithFont:font];
+        CGSize wordSize = [word sizeWithFont:font
+                                constrainedToSize:CGSizeMake(_width, CGFLOAT_MAX)
+                                lineBreakMode:UILineBreakModeWordWrap];
         if (lineWidth + wordSize.width > _width) {
-          if (0 && wordSize.width > _width) {
-            // The word is larger than an entire line, so we need to split it across lines
-            // XXXjoe TODO
-          } else {
-            // The word will be placed on the next line, so create a new frame for
-            // the current line and mark it with a line break
-            NSRange lineRange = NSMakeRange(lineStartIndex, index - lineStartIndex);
-            if (lineRange.length) {
-              NSString* line = [text substringWithRange:lineRange];
-              lastFrame = [self addFrameForText:line node:node after:lastFrame];
-              lastFrame.width = frameWidth;
-				if([node isKindOfClass:[TTStyledLinkNode class]]){
-					lastFrame.width += (3 + 16);  
-				}
-				lastFrame.height = wordSize.height;
-              lastFrame.font = font;
-            }
-            
-            lastFrame.lineBreak = YES;
-            lineStartIndex = lineRange.location + lineRange.length;
-            frameWidth = 0;
-            lineWidth = 0;
+          // The word will be placed on the next line, so create a new frame for
+          // the current line and mark it with a line break
+          NSRange lineRange = NSMakeRange(lineStartIndex, index - lineStartIndex);
+          if (lineRange.length) {
+            NSString* line = [text substringWithRange:lineRange];
+            lastFrame = [self addFrameForText:line node:node after:lastFrame];
+            lastFrame.style = style;
+            lastFrame.width = frameWidth;
+            lastFrame.height = font.ascender - font.descender;
+            lastFrame.font = font;
           }
+          
+          lastFrame.lineBreak = YES;
+          lineStartIndex = lineRange.location + lineRange.length;
+          frameWidth = 0;
+          lineWidth = 0;
         }
 
         if (!lineWidth) {
@@ -171,6 +182,11 @@
           if (node.nextNode) {
             // Count the height of the new line
             height += wordSize.height;
+
+            if (wordSize.width > _width) {
+              // The word is larger than an entire line, so we need to split it across lines
+              // XXXjoe TODO
+            }
           } else {
             // This is the last node, so we don't need to keep measuring every word.  We
             // can just measure all remaining text and create a new frame for all of it.
@@ -180,11 +196,9 @@
                                       lineBreakMode:UILineBreakModeWordWrap];
 
             lastFrame = [self addFrameForText:lines node:node after:lastFrame];
+            lastFrame.style = style;
             lastFrame.width = linesSize.width;
-			  if([node isKindOfClass:[TTStyledLinkNode class]]){
-				  lastFrame.width += (3 + 16);  
-			  }
-			  lastFrame.height = linesSize.height;
+            lastFrame.height = linesSize.height;
             lastFrame.font = font;
             height += linesSize.height;
             break;
@@ -201,11 +215,9 @@
                                                           - lineStartIndex);
           NSString* line = !lineWidth ? word : [text substringWithRange:lineRange];
           lastFrame = [self addFrameForText:line node:node after:lastFrame];
+          lastFrame.style = style;
           lastFrame.width = frameWidth;
-			if([node isKindOfClass:[TTStyledLinkNode class]]){
-				lastFrame.width += (3 + 16);  
-			}
-			lastFrame.height = wordSize.height;
+          lastFrame.height = wordSize.height;
           lastFrame.font = font;
           frameWidth = 0;
         }
@@ -263,6 +275,7 @@
 
 - (void)setWidth:(CGFloat)width {
   if (width != _width) {
+    TTLOG(@"%f TO %f", _width, width);
     _width = width;
     [self setNeedsLayout];
   }
@@ -284,65 +297,19 @@
 }
 
 - (void)drawAtPoint:(CGPoint)point highlighted:(BOOL)highlighted {
-  CGContextRef context = UIGraphicsGetCurrentContext();
-
   CGPoint origin = point;
   TTStyledTextFrame* frame = self.rootFrame;
   
   while (frame) {
     CGRect frameRect = CGRectMake(origin.x, origin.y, frame.width, frame.height);
-    if ([frame.node isKindOfClass:[TTStyledLinkNode class]]) {
-      TTStyledLinkNode* linkNode = (TTStyledLinkNode*)frame.node;
-		
-		UIImage *leftImage;
-		UIImage *middleImage;
-		UIImage *rightImage;
-		
-      if (!linkNode.highlighted) {
-//        UIColor* fill[] = {[UIColor colorWithWhite:1
-//											 alpha:0.25]};
-//        [[TTAppearance appearance] draw:TTStyleFill rect:CGRectInset(frameRect, -4, -3)
-//                                   fill:fill fillCount:1 stroke:nil radius:4];
-		  
-		  leftImage = [UIImage imageNamed:@"link-button-left.png"];
-		  middleImage = [UIImage imageNamed:@"link-button-middle.png"];
-		  rightImage = [UIImage imageNamed:@"link-button-right.png"];
-      }else{
-		  leftImage = [UIImage imageNamed:@"link-button-left-press.png"];
-		  middleImage = [UIImage imageNamed:@"link-button-middle-press.png"];
-		  rightImage = [UIImage imageNamed:@"link-button-right-press.png"];		  
-	  }
-		
-		[leftImage drawAtPoint:frameRect.origin blendMode:kCGBlendModeNormal alpha:1.0];
-		[middleImage drawInRect:CGRectMake(frameRect.origin.x + leftImage.size.width, frameRect.origin.y, frameRect.size.width - leftImage.size.width - rightImage.size.width, frameRect.size.height)
-					  blendMode:kCGBlendModeNormal 
-						  alpha:1.0];
-		[rightImage drawAtPoint:CGPointMake(frameRect.origin.x + frameRect.size.width - rightImage.size.width, frameRect.origin.y) blendMode:kCGBlendModeNormal alpha:1.0];
-      
-      if (!highlighted) {
-        CGContextSaveGState(context);
-        [[TTAppearance appearance].linkTextColor setFill];
-      }
-		
-		CGRect textFrame = CGRectMake(frameRect.origin.x + 5, frameRect.origin.y-1, frameRect.size.width - 3 - 16, frameRect.size.height);
-      
-      [frame.text drawInRect:textFrame withFont:frame.font];
-
-      if (!highlighted) {
-        CGContextRestoreGState(context);
-      }
-    } else if ([frame.node isKindOfClass:[TTStyledBoldNode class]]) {
-      [frame.text drawInRect:frameRect withFont:frame.font];
-    } else if ([frame.node isKindOfClass:[TTStyledItalicNode class]]) {
-      [frame.text drawInRect:frameRect withFont:frame.font];
-    } else if ([frame.node isKindOfClass:[TTStyledImageNode class]]) {
+    if ([frame.node isKindOfClass:[TTStyledImageNode class]]) {
       TTStyledImageNode* imageNode = (TTStyledImageNode*)frame.node;
       UIImage* image = imageNode.image;
       CGRect imageRect = CGRectMake(origin.x, (origin.y+frame.height)-image.size.height,
                                     image.size.width, image.size.height);
       [imageNode.image drawInRect:imageRect];
     } else {
-      [frame.text drawInRect:frameRect withFont:frame.font];
+      [frame drawInRect:frameRect];
     }
 
     origin.x += frame.width;
@@ -381,7 +348,7 @@
 
 @implementation TTStyledTextFrame
 
-@synthesize node = _node, nextFrame = _nextFrame, text = _text, font = _font,
+@synthesize node = _node, nextFrame = _nextFrame, style = _style, text = _text, font = _font,
             width = _width, height = _height, lineBreak = _lineBreak;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -392,6 +359,7 @@
     _text = [text retain];
     _nextFrame = nil;
     _node = [node retain];
+    _style = nil;
     _font = nil;
     _width = 0;
     _height = 0;
@@ -403,6 +371,7 @@
 - (void)dealloc {
   [_node release];
   [_nextFrame release];
+  [_style release];
   [_text release];
   [_font release];
   [super dealloc];
@@ -419,5 +388,48 @@
   return string;
 }
 
-@end
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// TTStyleDelegate
 
+- (void)drawLayer:(TTStyleContext*)context withStyle:(TTStyle*)style {
+  CGRect rect = context.frame;
+  if ([style isKindOfClass:[TTTextStyle class]]) {
+    TTTextStyle* textStyle = (TTTextStyle*)style;
+    UIFont* font = textStyle.font ? textStyle.font : _font;
+    if (textStyle.color) {
+      CGContextRef context = UIGraphicsGetCurrentContext();
+      CGContextSaveGState(context);
+      [textStyle.color setFill];
+      [_text drawInRect:rect withFont:font];
+      CGContextRestoreGState(context);
+    } else {
+      [_text drawInRect:rect withFont:font];
+    }
+  } else {
+    [_text drawInRect:rect withFont:_font];
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// public
+
+- (void)drawInRect:(CGRect)rect {
+  TTStyleContext* context = [[[TTStyleContext alloc] init] autorelease];
+  context.delegate = self;
+  context.frame = rect;
+  context.contentFrame = rect;
+
+  if ([_node isKindOfClass:[TTStyledLinkNode class]] && [(TTStyledLinkNode*)_node highlighted]) {
+    TTStyle* style = TTSTYLE(linkTextHighlighted);
+    [style draw:context];
+  } else {
+    if (_style) {
+      if ([_style draw:context]) {
+        return;
+      }
+    }
+    [_text drawInRect:rect withFont:_font];
+  }
+}
+
+@end
