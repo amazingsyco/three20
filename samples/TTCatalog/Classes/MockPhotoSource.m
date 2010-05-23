@@ -1,5 +1,7 @@
 #import "MockPhotoSource.h"
 
+#import "Three20Core/NSArrayAdditions.h"
+
 @implementation MockPhotoSource
 
 @synthesize title = _title;
@@ -9,12 +11,9 @@
 
 - (void)fakeLoadReady {
   _fakeLoadTimer = nil;
-  _loadedTime = [[NSDate date] retain];
 
   if (_type & MockPhotoSourceLoadError) {
-    for (id<TTPhotoSourceDelegate> delegate in _delegates) {
-      [delegate photoSource:self didFailLoadWithError:nil];
-    }
+    [_delegates perform:@selector(model:didFailLoadWithError:) withObject:self withObject:nil];
   } else {
     NSMutableArray* newPhotos = [NSMutableArray array];
 
@@ -26,12 +25,11 @@
     }
 
     [newPhotos addObjectsFromArray:_tempPhotos];
-    [_tempPhotos release];
-    _tempPhotos = nil;
+    TT_RELEASE_SAFELY(_tempPhotos);
 
     [_photos release];
     _photos = [newPhotos retain];
-    
+
     for (int i = 0; i < _photos.count; ++i) {
       id<TTPhoto> photo = [_photos objectAtIndex:i];
       if ((NSNull*)photo != [NSNull null]) {
@@ -40,9 +38,7 @@
       }
     }
 
-    for (id<TTPhotoSourceDelegate> delegate in _delegates) {
-      [delegate photoSourceDidFinishLoad:self];
-    }
+    [_delegates perform:@selector(modelDidFinishLoad:) withObject:self];
   }
 }
 
@@ -50,15 +46,13 @@
 // NSObject
 
 - (id)initWithType:(MockPhotoSourceType)type title:(NSString*)title photos:(NSArray*)photos
-    photos2:(NSArray*)photos2 {
+      photos2:(NSArray*)photos2 {
   if (self = [super init]) {
     _type = type;
-    _delegates = nil;
-    _loadedTime = nil;
-    
-    self.title = title;
+    _title = [title copy];
     _photos = photos2 ? [photos mutableCopy] : [[NSMutableArray alloc] init];
     _tempPhotos = photos2 ? [photos2 retain] : [photos retain];
+    _fakeLoadTimer = nil;
 
     for (int i = 0; i < _photos.count; ++i) {
       id<TTPhoto> photo = [_photos objectAtIndex:i];
@@ -68,62 +62,44 @@
       }
     }
 
-    if (_type & MockPhotoSourceDelayed || photos2) {
-    } else {
+    if (!(_type & MockPhotoSourceDelayed || photos2)) {
       [self performSelector:@selector(fakeLoadReady)];
     }
   }
   return self;
 }
 
+- (id)init {
+  return [self initWithType:MockPhotoSourceNormal title:nil photos:nil photos2:nil];
+}
+
 - (void)dealloc {
   [_fakeLoadTimer invalidate];
-  [_delegates release];
-  [_photos release];
-  [_tempPhotos release];
-  [_title release];
+  TT_RELEASE_SAFELY(_photos);
+  TT_RELEASE_SAFELY(_tempPhotos);
+  TT_RELEASE_SAFELY(_title);
   [super dealloc];
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// TTPersistable
-
-- (NSString*)viewURL {
-  return nil;
-}
-
-+ (id<TTPersistable>)fromURL:(NSURL*)url {
-  return nil;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// TTLoadable
-
-- (NSDate*)loadedTime {
-  return _loadedTime;
-}
+// TTModel
 
 - (BOOL)isLoading {
   return !!_fakeLoadTimer;
 }
 
-- (BOOL)isLoadingMore {
-  return NO;
-}
-
 - (BOOL)isLoaded {
-  return !!_loadedTime;
+  return !!_photos;
 }
 
-- (BOOL)isOutdated {
-  return NO;
-}
+- (void)load:(TTURLRequestCachePolicy)cachePolicy more:(BOOL)more {
+  if (cachePolicy & TTURLRequestCachePolicyNetwork) {
+    [_delegates perform:@selector(modelDidStartLoad:) withObject:self];
 
-- (BOOL)isEmpty {
-  return NO;
-}
-
-- (void)invalidate:(BOOL)erase {
+    TT_RELEASE_SAFELY(_photos);
+    _fakeLoadTimer = [NSTimer scheduledTimerWithTimeInterval:2 target:self
+      selector:@selector(fakeLoadReady) userInfo:nil repeats:NO];
+  }
 }
 
 - (void)cancel {
@@ -133,13 +109,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // TTPhotoSource
-
-- (NSMutableArray*)delegates {
-  if (!_delegates) {
-    _delegates = TTCreateNonRetainingArray();
-  }
-  return _delegates;
-}
 
 - (NSInteger)numberOfPhotos {
   if (_tempPhotos) {
@@ -153,9 +122,9 @@
   return _photos.count-1;
 }
 
-- (id<TTPhoto>)photoAtIndex:(NSInteger)index {
-  if (index < _photos.count) {
-    id photo = [_photos objectAtIndex:index];
+- (id<TTPhoto>)photoAtIndex:(NSInteger)photoIndex {
+  if (photoIndex < _photos.count) {
+    id photo = [_photos objectAtIndex:photoIndex];
     if (photo == [NSNull null]) {
       return nil;
     } else {
@@ -163,18 +132,6 @@
     }
   } else {
     return nil;
-  }
-}
-
-- (void)loadPhotosFromIndex:(NSInteger)fromIndex toIndex:(NSInteger)toIndex
-    cachePolicy:(TTURLRequestCachePolicy)cachePolicy {
-  if (cachePolicy & TTURLRequestCachePolicyNetwork) {
-    for (id<TTPhotoSourceDelegate> delegate in _delegates) {
-      [delegate photoSourceDidStartLoad:self];
-    }
-    
-    _fakeLoadTimer = [NSTimer scheduledTimerWithTimeInterval:2 target:self
-      selector:@selector(fakeLoadReady) userInfo:nil repeats:NO];
   }
 }
 
@@ -189,15 +146,15 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // NSObject
 
-- (id)initWithURL:(NSString*)url smallURL:(NSString*)smallURL size:(CGSize)size {
-  return [self initWithURL:url smallURL:smallURL size:size caption:nil];
+- (id)initWithURL:(NSString*)URL smallURL:(NSString*)smallURL size:(CGSize)size {
+  return [self initWithURL:URL smallURL:smallURL size:size caption:nil];
 }
 
-- (id)initWithURL:(NSString*)url smallURL:(NSString*)smallURL size:(CGSize)size
+- (id)initWithURL:(NSString*)URL smallURL:(NSString*)smallURL size:(CGSize)size
     caption:(NSString*)caption {
   if (self = [super init]) {
     _photoSource = nil;
-    _url = [url copy];
+    _URL = [URL copy];
     _smallURL = [smallURL copy];
     _thumbURL = [smallURL copy];
     _size = size;
@@ -208,32 +165,21 @@
 }
 
 - (void)dealloc {
-  [_url release];
-  [_smallURL release];
-  [_thumbURL release];
-  [_caption release];
+  TT_RELEASE_SAFELY(_URL);
+  TT_RELEASE_SAFELY(_smallURL);
+  TT_RELEASE_SAFELY(_thumbURL);
+  TT_RELEASE_SAFELY(_caption);
   [super dealloc];
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// TTPersistable
-
-- (NSString*)viewURL {
-  return nil;
-}
-
-+ (id<TTPersistable>)fromURL:(NSURL*)url {
-  return nil;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // TTPhoto
 
-- (NSString*)urlForVersion:(TTPhotoVersion)version {
+- (NSString*)URLForVersion:(TTPhotoVersion)version {
   if (version == TTPhotoVersionLarge) {
-    return _url;
+    return _URL;
   } else if (version == TTPhotoVersionMedium) {
-    return _url;
+    return _URL;
   } else if (version == TTPhotoVersionSmall) {
     return _smallURL;
   } else if (version == TTPhotoVersionThumbnail) {

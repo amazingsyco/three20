@@ -1,84 +1,89 @@
 
 #import "TableTestController.h"
-#import "MockDataSource.h"
-
-@implementation TableTestController
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// private
 
-- (void)cycle {
-  if (!self.viewState) {
-    [self invalidateViewState:TTViewLoading];
-    self.navigationItem.rightBarButtonItem = [[[UIBarButtonItem alloc]
-      initWithTitle:@"Error" style:UIBarButtonItemStyleBordered target:self
-      action:@selector(cycle)] autorelease];
-  } else if (self.viewState & TTViewLoading) {
-    [self invalidateViewState:TTViewDataLoadedError];
-    self.navigationItem.rightBarButtonItem = [[[UIBarButtonItem alloc]
-      initWithTitle:@"Empty" style:UIBarButtonItemStyleBordered target:self
-      action:@selector(cycle)] autorelease];
-  } else if (self.viewState & TTViewDataLoadedError) {
-    [self invalidateViewState:TTViewEmpty];
-    self.navigationItem.rightBarButtonItem = [[[UIBarButtonItem alloc]
-      initWithTitle:@"Loading" style:UIBarButtonItemStyleBordered target:self
-      action:@selector(cycle)] autorelease];
-  }
-}
+@interface TableTestDataSource : TTListDataSource
+@end
+
+@implementation TableTestDataSource
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// NSObject
+// TTTableViewDataSource
 
-- (id)init {
-  if (self = [super init]) {
-  }
-  return self;
+- (UIImage*)imageForEmpty {
+  return TTIMAGE(@"bundle://Three20.bundle/images/empty.png");
 }
 
-- (void)dealloc {
-	[super dealloc];
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// UIViewController
-//
-- (void)loadView {
-  self.navigationItem.rightBarButtonItem = [[[UIBarButtonItem alloc]
-    initWithTitle:@"Loading" style:UIBarButtonItemStyleBordered target:self
-    action:@selector(cycle)] autorelease];
-  
-  self.view = [[[UIView alloc] initWithFrame:TTApplicationFrame()] autorelease];
-     
-  self.tableView = [[[UITableView alloc] initWithFrame:self.view.bounds
-    style:UITableViewStylePlain] autorelease];
-	self.tableView.autoresizingMask = 
-    UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-  self.tableView.sectionIndexMinimumDisplayRowCount = 2;
-  [self.view addSubview:self.tableView];
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// TTTableViewController
-
-- (UIImage*)imageForNoData {
-  return [UIImage imageNamed:@"Three20.bundle/images/empty.png"];
-}
-
-- (NSString*)titleForNoData {
+- (NSString*)titleForEmpty {
   return NSLocalizedString(@"No Friends", @"");
 }
 
-- (NSString*)subtitleForNoData {
+- (NSString*)subtitleForEmpty {
   return NSLocalizedString(@"Try getting some friends.", @"");
 }
 
 - (UIImage*)imageForError:(NSError*)error {
-  return [UIImage imageNamed:@"Three20.bundle/images/error.png"];
+  return TTIMAGE(@"bundle://Three20.bundle/images/error.png");
 }
 
 - (NSString*)subtitleForError:(NSError*)error {
   return NSLocalizedString(@"There was an error loading your friends.", @"");
 }
 
+@end
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+@implementation TableTestController
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// private
+
+- (void)cycleModelState {
+//  if (self.modelState == TTModelStateNone) {
+//    self.modelState = TTModelStateLoading;
+//  } else if (self.modelState == TTModelStateLoading) {
+//    self.modelState = TTModelStateLoaded;
+//  } else if (self.modelState == TTModelStateLoaded) {
+//    self.modelState = TTModelStateLoaded|TTModelStateReloading;
+//  } else if (self.modelState == TTModelStateLoaded|TTModelStateReloading) {
+//    self.modelState = TTModelStateLoadedError;
+//  } else if (self.modelState == TTModelStateLoadedError) {
+//    self.modelState = TTModelStateNone;
+//  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// UIViewController
+
+- (void)loadView {
+  [super loadView];
+  
+  self.navigationItem.rightBarButtonItem = [[[UIBarButtonItem alloc]
+    initWithTitle:@"Next" style:UIBarButtonItemStyleBordered target:self
+    action:@selector(cycleModelState)] autorelease];
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// TTModelViewController
+
+- (void)createModel {
+  self.dataSource = [[[TableTestDataSource alloc] init] autorelease];
+}
+
+- (void)modelDidChangeState {
+//  if (self.modelState == TTModelStateNone) {
+//    self.title = @"None";
+//  } else if (self.modelState == TTModelStateLoading) {
+//    self.title = @"Loading";
+//  } else if (self.modelState == TTModelStateLoaded) {
+//    self.title = @"Loaded";
+//  } else if (self.modelState == TTModelStateLoaded|TTModelStateReloading) {
+//    self.title = @"Reloading";
+//  } else if (self.modelState == TTModelStateLoadedError) {
+//    self.title = @"LoadedError";
+//  }
+}
 
 @end

@@ -1,18 +1,19 @@
 #import "TabBarTestController.h"
+#import <Three20UI/UIViewAdditions.h>
 
 @implementation TabBarTestController
 
 - (void)dealloc {
-  [_tabBar1 release];
-  [_tabBar2 release];
-  [_tabBar3 release];
+  TT_RELEASE_SAFELY(_tabBar1);
+  TT_RELEASE_SAFELY(_tabBar2);
+  TT_RELEASE_SAFELY(_tabBar3);
   [super dealloc];
 }
 
 - (void)loadView {
   self.view = [[[UIView alloc] initWithFrame:[UIScreen mainScreen].applicationFrame] autorelease];
   self.view.backgroundColor = TTSTYLEVAR(tabTintColor);
-    
+
   _tabBar1 = [[TTTabStrip alloc] initWithFrame:CGRectMake(0, 0, 320, 41)];
   _tabBar1.tabItems = [NSArray arrayWithObjects:
     [[[TTTabItem alloc] initWithTitle:@"Item 1"] autorelease],
@@ -29,7 +30,6 @@
   [self.view addSubview:_tabBar1];
 
   _tabBar2 = [[TTTabBar alloc] initWithFrame:CGRectMake(0, _tabBar1.bottom, 320, 40)];
-  _tabBar2.contentMode = UIViewContentModeScaleToFill;
   _tabBar2.tabItems = [NSArray arrayWithObjects:
     [[[TTTabItem alloc] initWithTitle:@"Banana"] autorelease],
     [[[TTTabItem alloc] initWithTitle:@"Cherry"] autorelease],
@@ -38,7 +38,7 @@
     nil];
   _tabBar2.selectedTabIndex = 2;
   [self.view addSubview:_tabBar2];
-  
+
   TTTabItem* item = [_tabBar2.tabItems objectAtIndex:1];
   item.badgeNumber = 2;
 
