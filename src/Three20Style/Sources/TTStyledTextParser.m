@@ -262,7 +262,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 - (void)parseXHTML:(NSString*)html {
   NSString* document = [NSString stringWithFormat:@"<x>%@</x>", html];
-  NSData* data = [document dataUsingEncoding:html.fastestEncoding];
+  NSData* data = [document dataUsingEncoding:NSUTF8StringEncoding];
   NSXMLParser* parser = [[[NSXMLParser alloc] initWithData:data] autorelease];
   parser.delegate = self;
   [parser parse];
